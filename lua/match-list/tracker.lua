@@ -203,7 +203,8 @@ end
 
 ---Attaches the tracker to the given buffer.
 ---@param buffer integer? The buffer to attach to. `nil` for the current buffer.
-function Tracker:attach(buffer)
+---@param group string|string[]|nil The name of the match groups to use or `nil` for default.
+function Tracker:attach(buffer, group)
 	if not buffer or not vim.api.nvim_buf_is_valid(buffer) then
 		buffer = vim.api.nvim_get_current_buf()
 	end
@@ -236,6 +237,10 @@ function Tracker:attach(buffer)
 		})
 
 		self._config.attach(buffer, self)
+
+		if group then
+			self:set_group(group, buffer)
+		end
 
 		tracker:schedule_update(true)
 		tracker._matches = nil

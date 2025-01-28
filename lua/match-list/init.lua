@@ -24,16 +24,10 @@ function M.setup(config)
 
 	-- Select group command.
 	local function group(args, buffer)
-		if #args == 1 then
+		if #args == 0 then
 			M.select_group(buffer)
 		else
-			local groups = {}
-
-			for i=2,#args do
-				table.insert(groups, args[i])
-			end
-
-			M.set_group(groups, buffer)
+			M.set_group(args, buffer)
 		end
 	end
 
@@ -41,8 +35,8 @@ function M.setup(config)
 		if #args > 1 then
 			local types = {}
 
-			for i=2,#args do
-				types[args[i]] = true
+			for _, arg in ipairs(args) do
+				types[arg] = true
 			end
 
 			return {
@@ -56,7 +50,13 @@ function M.setup(config)
 	end
 
 	local commands = {
-		attach = function() M.attach() end,
+		attach = function(args)
+			if #args > 0 then
+				M.attach(nil, args)
+			else
+				M.attach()
+			end
+		end,
 		detach = function() M.detach() end,
 		debug = function() M.debug() end,
 		select = function() M.select() end,
@@ -68,6 +68,7 @@ function M.setup(config)
 		unselect = function() M.unselect() end,
 		group = function(args) group(args, nil) end,
 		lgroup = function(args) group(args, 0) end,
+		quickfix = function() M.send_to_quickfix() end,
 	}
 
 	local command = function(args)
@@ -75,9 +76,14 @@ function M.setup(config)
 			M.select()
 		else
 			local fun = commands[args.fargs[1]]
+			local rest = {}
+
+			for i=2,#args.fargs do
+				table.insert(rest, args.fargs[i])
+			end
 
 			if fun then
-				fun(args.fargs)
+				fun(rest)
 			else
 				vim.notify("Error: unrecognized command", vim.log.levels.ERROR)
 			end
@@ -129,8 +135,9 @@ end
 
 ---Attaches the match list to the given buffer.
 ---@param buffer integer? The buffer to attach to. `nil` for the current buffer.
-function M.attach(buffer)
-	M._tracker:attach(buffer)
+---@param group string|string[]|nil The name of the match groups to use or `nil` for default.
+function M.attach(buffer, group)
+	M._tracker:attach(buffer, group)
 end
 
 ---Detaches the match list from the given buffer.
@@ -266,6 +273,46 @@ end
 ---Resets the current item selection.
 function M.unselect()
 	M._tracker:unselect()
+end
+
+---@alias MatchList.QuickFixConvertFun fun(MatchList.Match): table
+
+---@class MatchList.QuickFixConfig
+---@field convert MatchList.QuickFixConvertFun? Conversion function.
+---@field open boolean? `true` to open the quickfix.
+
+---Sends the current list of matches to the quickfix.
+---@param config MatchList.QuickFixConfig? Configuration options.
+function M.send_to_quickfix(config)
+	local def_config = {
+		convert = function(match)
+			return {
+				filename = match.data["file"],
+				lnum = match.data["lnum"],
+				col = match.data["col"],
+				text = match.data["message"],
+				type = string.sub(match.data["type"] or "H", 1, 1),
+			}
+		end,
+		open = true,
+	}
+
+	config = vim.tbl_extend("force", def_config, config or {})
+	local items = {}
+
+	for _, match in ipairs(M._tracker:get_matches()) do
+		local item = config.convert(match)
+
+		if item then
+			table.insert(items, item)
+		end
+	end
+
+	vim.fn.setqflist(items, ' ')
+
+	if config.open then
+		vim.cmd.copen()
+	end
 end
 
 return M
