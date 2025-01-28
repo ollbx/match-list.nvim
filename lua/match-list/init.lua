@@ -59,7 +59,8 @@ function M.setup(config)
 		attach = function() M.attach() end,
 		detach = function() M.detach() end,
 		debug = function() M.debug() end,
-		goto = function() M.goto() end,
+		select = function() M.select() end,
+		goto = function() M.goto_below_cursor() end,
 		next = function(args) M.next(make_filter(args)) end,
 		prev = function(args) M.prev(make_filter(args)) end,
 		first = function() M.first() end,
@@ -71,7 +72,7 @@ function M.setup(config)
 
 	local command = function(args)
 		if #args.fargs == 0 then
-			M.goto()
+			M.select()
 		else
 			local fun = commands[args.fargs[1]]
 
@@ -203,7 +204,7 @@ end
 
 ---Opens a selection window for navigating to a specific match.
 ---@param config MatchList.GotoConfig? The navigation configaruation.
-function M.goto(config)
+function M.select(config)
 	local def_config = {
 		format = default_format,
 	}
@@ -218,6 +219,13 @@ function M.goto(config)
 			M._tracker:goto_match(choice, config)
 		end
 	end)
+end
+
+---Finds the match item below the cursor and navigates to it.
+---@param config MatchList.Tracker.GotoConfig? The navigation config.
+---@return MatchList.Match? match The match found or `nil`.
+function M.goto_below_cursor(config)
+	return M._tracker:goto_below_cursor(config)
 end
 
 ---Navigates to the specified match.
