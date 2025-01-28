@@ -1,5 +1,5 @@
 local M = {
-	tracker = nil,
+	_tracker = nil,
 }
 
 ---@class MatchList.Config: MatchList.Tracker.Config
@@ -14,8 +14,8 @@ function M.setup(config)
 
 		local groups = Scanner.parse_groups(config.groups or {})
 
-		M.tracker = Tracker.new(config)
-		M.tracker:setup_groups(groups)
+		M._tracker = Tracker.new(config)
+		M._tracker:setup_groups(groups)
 	end)
 
 	if not ok then
@@ -92,14 +92,14 @@ end
 ---Returns the list of configured match groups.
 ---@return string[] groups The configured groups.
 function M.get_available_groups()
-	return M.tracker:get_available_groups()
+	return M._tracker:get_available_groups()
 end
 
 ---Selects the match groups to use for matching.
 ---@param group string|string[]|nil The name of the match groups to use or `nil` reset it.
 ---@param buffer integer? Restrict to buffer (0 for current buffer). `nil` to select globally.
 function M.set_group(group, buffer)
-	M.tracker:set_group(group, buffer)
+	M._tracker:set_group(group, buffer)
 end
 
 ---Selects the match group using the UI.
@@ -123,19 +123,19 @@ end
 ---Returns the list of groups selected for a buffer.
 ---@param buffer integer? The buffer to query (`nil` or 0 for current buffer).
 function M.get_groups(buffer)
-	return M.tracker:get_groups(buffer)
+	return M._tracker:get_groups(buffer)
 end
 
 ---Attaches the match list to the given buffer.
 ---@param buffer integer? The buffer to attach to. `nil` for the current buffer.
 function M.attach(buffer)
-	M.tracker:attach(buffer)
+	M._tracker:attach(buffer)
 end
 
 ---Detaches the match list from the given buffer.
 ---@param buffer integer? The buffer to detach from. `nil` for the current buffer.
 function M.detach(buffer)
-	M.tracker:detach(buffer)
+	M._tracker:detach(buffer)
 end
 
 ---Opens the match expression debugger.
@@ -151,25 +151,25 @@ end
 ---Returns the currently selected match.
 ---@return MatchList.Match? The currently selected match or nil.
 function M.get_current()
-	return M.tracker:get_current()
+	return M._tracker:get_current()
 end
 
 ---Returns the index of the currently selected match.
 ---@return integer The currently selected index or 0 (if none is selected).
 function M.get_current_index()
-	return M.tracker:get_current_index()
+	return M._tracker:get_current_index()
 end
 
 ---Returns all currently tracked matches.
 ---@return MatchList.Match[] matches The matches list.
 function M.get_matches()
-	return M.tracker:get_matches()
+	return M._tracker:get_matches()
 end
 
 ---Returns all currently visible matches.
 ---@return MatchList.Match[] matches The matches list.
 function M.get_visible_matches()
-	return M.tracker:get_visible_matches()
+	return M._tracker:get_visible_matches()
 end
 
 ---Default function used for formatting a match.
@@ -210,12 +210,12 @@ function M.goto(config)
 
 	config = vim.tbl_extend("force", def_config, config or {})
 
-	vim.ui.select(M.tracker:get_matches(), {
+	vim.ui.select(M._tracker:get_matches(), {
 		prompt = "Goto match:",
 		format_item = config.format,
 	}, function(choice)
 		if choice then
-			M.tracker:goto_match(choice, config)
+			M._tracker:goto_match(choice, config)
 		end
 	end)
 end
@@ -224,40 +224,40 @@ end
 ---@param match MatchList.Match The match to scroll to.
 ---@param config MatchList.Tracker.GotoConfig? The navigation config.
 function M.goto_match(match, config)
-	M.tracker:goto_match(match, config)
+	M._tracker:goto_match(match, config)
 end
 
 ---Moves to the next item.
 ---@param config MatchList.Tracker.GotoConfig? The navigation config.
 ---@return MatchList.Match? match The match found or `nil`.
 function M.next(config)
-	return M.tracker:next(config)
+	return M._tracker:next(config)
 end
 
 ---Moves to the previous item.
 ---@param config MatchList.Tracker.GotoConfig? The navigation config.
 ---@return MatchList.Match? match The match found or `nil`.
 function M.prev(config)
-	return M.tracker:prev(config)
+	return M._tracker:prev(config)
 end
 
 ---Moves to the first item.
 ---@param config MatchList.Tracker.GotoConfig? The navigation config.
 ---@return MatchList.Match? match The match found or `nil`.
 function M.first(config)
-	return M.tracker:first(config)
+	return M._tracker:first(config)
 end
 
 ---Moves to the last item.
 ---@param config MatchList.Tracker.GotoConfig? The navigation config.
 ---@return MatchList.Match? match The match found or `nil`.
 function M.last(config)
-	return M.tracker:last(config)
+	return M._tracker:last(config)
 end
 
 ---Resets the current item selection.
 function M.unselect()
-	M.tracker:unselect()
+	M._tracker:unselect()
 end
 
 return M
