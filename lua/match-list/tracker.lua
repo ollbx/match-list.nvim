@@ -25,18 +25,18 @@ local UPDATE_TIMEOUT = 25
 ---@field highlight MatchList.Tracker.HighlightFun? Hook for customizing highlights.
 
 ---@class MatchList.Tracker Tracks and highlights matches in buffers.
----@field namespace integer The namespace used for extmarks.
----@field config MatchList.Tracker.Config The tracker configuration.
----@field buffers { integer: MatchList.Tracker.Buffer } The buffers tracked.
----@field groups { string: MatchList.Scanner[] } The scanner groups available.
----@field group string[]? The currently selected group.
----@field matches MatchList.Match[]? The cached list of matches.
----@field visible_matches MatchList.Match[] The list of visible matches.
----@field scheduled boolean `true` if an update has been scheduled.
----@field update_time integer The timestamp of the last update.
----@field update_timer uv.uv_timer_t? The update timer ID.
----@field current integer The currently selected index.
----@field hooks MatchList.Tracker.Hooks Hook functions.
+---@field _namespace integer The namespace used for extmarks.
+---@field _config MatchList.Tracker.Config The tracker configuration.
+---@field _buffers { integer: MatchList.Tracker.Buffer } The buffers tracked.
+---@field _groups { string: MatchList.Scanner[] } The scanner groups available.
+---@field _group string[]? The currently selected group.
+---@field _matches MatchList.Match[]? The cached list of matches.
+---@field _visible_matches MatchList.Match[] The list of visible matches.
+---@field _scheduled boolean `true` if an update has been scheduled.
+---@field _update_time integer The timestamp of the last update.
+---@field _update_timer uv.uv_timer_t? The update timer ID.
+---@field _current integer The currently selected index.
+---@field _hooks MatchList.Tracker.Hooks Hook functions.
 local Tracker = {}
 Tracker.__index = Tracker
 
@@ -64,18 +64,18 @@ function M.new(config)
 	config = vim.tbl_extend("force", def_config, config or {})
 
 	local ui = {
-		namespace = vim.api.nvim_create_namespace(""),
-		config = config,
-		buffers = {},
-		groups = {},
-		group = nil,
-		matches = nil,
-		visible_matches = {},
-		scheduled = false,
-		update_time = vim.uv.now(),
-		update_timer = nil,
-		current = 0,
-		hooks = {
+		_namespace = vim.api.nvim_create_namespace(""),
+		_config = config,
+		_buffers = {},
+		_groups = {},
+		_group = nil,
+		_matches = nil,
+		_visible_matches = {},
+		_scheduled = false,
+		_update_time = vim.uv.now(),
+		_update_timer = nil,
+		_current = 0,
+		_hooks = {
 			update = function() end,
 		}
 	}
@@ -103,7 +103,7 @@ end
 ---Updates the match groups.
 ---@param groups { string: MatchList.Scanner[] } The match groups.
 function Tracker:setup_groups(groups)
-	self.groups = groups
+	self._groups = groups
 	self:schedule_update(true)
 end
 
@@ -111,7 +111,7 @@ end
 ---@param name string The name of the match group to set.
 ---@param group MatchList.Scanner[] The match group.
 function Tracker:setup_group(name, group)
-	self.groups[name] = group
+	self._groups[name] = group
 	self:schedule_update(true)
 end
 
@@ -120,7 +120,7 @@ end
 function Tracker:get_available_groups()
 	local groups = {}
 
-	for group, _ in pairs(self.groups) do
+	for group, _ in pairs(self._groups) do
 		table.insert(groups, group)
 	end
 
@@ -147,19 +147,20 @@ function Tracker:set_group(group, buffer)
 	end
 
 	if buffer == nil then
-		self.group = group
+		self._group = group
 	else
 		if buffer == 0 then
 			buffer = vim.api.nvim_get_current_buf()
 		end
 
-		local config = self.buffers[buffer]
+		local config = self._buffers[buffer]
 
 		if config then
 			config.group = group
 		end
 	end
 
+	self._matches = nil
 	self:schedule_update(true)
 end
 
@@ -170,12 +171,12 @@ function Tracker:get_groups(buffer)
 		buffer = vim.api.nvim_get_current_buf()
 	end
 
-	local config = self.buffers[buffer]
+	local config = self._buffers[buffer]
 
 	if config then
-		return (config.group or self.group) or { "default" }
+		return (config.group or self._group) or { "default" }
 	else
-		return self.group or { "default" }
+		return self._group or { "default" }
 	end
 end
 
@@ -186,26 +187,26 @@ function Tracker:attach(buffer)
 		buffer = vim.api.nvim_get_current_buf()
 	end
 
-	if not self.buffers[buffer] then
-		self.buffers[buffer] = {}
+	if not self._buffers[buffer] then
+		self._buffers[buffer] = {}
 
 		-- Schedule an update if our buffer changes.
 		local ui = self
 
 		vim.api.nvim_buf_attach(buffer, false, {
 			on_reload = function()
-				if ui.buffers[buffer] then
+				if ui._buffers[buffer] then
 					ui:schedule_update()
-					ui.matches = nil
+					ui._matches = nil
 				else
 					-- detach
 					return true
 				end
 			end,
 			on_lines = function()
-				if ui.buffers[buffer] then
+				if ui._buffers[buffer] then
 					ui:schedule_update()
-					ui.matches = nil
+					ui._matches = nil
 				else
 					-- detach
 					return true
@@ -214,7 +215,7 @@ function Tracker:attach(buffer)
 		})
 
 		ui:schedule_update(true)
-		ui.matches = nil
+		ui._matches = nil
 	end
 end
 
@@ -225,9 +226,9 @@ function Tracker:detach(buffer)
 		buffer = vim.api.nvim_get_current_buf()
 	end
 
-	if self.buffers[buffer] then
-		vim.api.nvim_buf_clear_namespace(buffer, self.namespace, 0, -1)
-		self.buffers[buffer] = nil
+	if self._buffers[buffer] then
+		vim.api.nvim_buf_clear_namespace(buffer, self._namespace, 0, -1)
+		self._buffers[buffer] = nil
 		self:schedule_update(true)
 	end
 end
@@ -236,28 +237,28 @@ end
 ---@param now boolean? Specify `true` to force an update as soon as possible.
 function Tracker:schedule_update(now)
 	-- If we do a forced update and one is scheduled, kill the scheduled update.
-	if now and self.scheduled then
-		self.update_timer:close()
-		self.update_timer = nil
-		self.scheduled = false
+	if now and self._scheduled then
+		self._update_timer:close()
+		self._update_timer = nil
+		self._scheduled = false
 	end
 
 	-- This will limit the amount of updates to only one update per `update_timeout`.
-	if not self.scheduled then
+	if not self._scheduled then
 		local ui = self
-		self.scheduled = true
+		self._scheduled = true
 
-		local elapsed = vim.uv.now() - self.update_time
+		local elapsed = vim.uv.now() - self._update_time
 		local wait = UPDATE_TIMEOUT - math.min(elapsed, UPDATE_TIMEOUT)
 
 		if now then
 			wait = 0
 		end
 
-		self.update_timer = vim.defer_fn(function()
+		self._update_timer = vim.defer_fn(function()
 			ui:update()
-			ui.scheduled = false
-			ui.update_time = vim.uv.now()
+			ui._scheduled = false
+			ui._update_time = vim.uv.now()
 		end, wait)
 	end
 end
@@ -266,7 +267,7 @@ end
 function Tracker:check_buffers()
 	local update = false
 
-	for buffer, _ in pairs(self.buffers) do
+	for buffer, _ in pairs(self._buffers) do
 		if not vim.api.nvim_buf_is_valid(buffer) then
 			update = true
 			break
@@ -276,13 +277,13 @@ function Tracker:check_buffers()
 	if update then
 		local buffers = {}
 
-		for buffer, config in pairs(self.buffers) do
+		for buffer, config in pairs(self._buffers) do
 			if vim.api.nvim_buf_is_valid(buffer) then
 				buffers[buffer] = config
 			end
 		end
 
-		self.buffers = buffers
+		self._buffers = buffers
 	end
 end
 
@@ -293,8 +294,8 @@ function Tracker:update()
 	self:check_buffers()
 
 	-- Clear all existing extmarks.
-	for buffer, _ in pairs(self.buffers) do
-		vim.api.nvim_buf_clear_namespace(buffer, self.namespace, 0, -1)
+	for buffer, _ in pairs(self._buffers) do
+		vim.api.nvim_buf_clear_namespace(buffer, self._namespace, 0, -1)
 	end
 
 	-- Collect all the windows that show our buffers.
@@ -303,11 +304,11 @@ function Tracker:update()
 	-- Figure out the longest multi-line error we can match.
 	local lines = 1
 
-	for _, scanner in ipairs(self.groups) do
+	for _, scanner in ipairs(self._groups) do
 		lines = math.max(lines, scanner:get_lines())
 	end
 
-	self.visible_matches = {}
+	self._visible_matches = {}
 
 	for _, window in ipairs(windows) do
 		-- Scan the visible area of the buffer for the given window.
@@ -316,7 +317,7 @@ function Tracker:update()
 		local groups = self:get_groups(window.bufnr)
 
 		for _, group in ipairs(groups) do
-			local scanners = self.groups[group] or {}
+			local scanners = self._groups[group] or {}
 
 			for _, scanner in ipairs(scanners) do
 				local matches = scanner:scan(window.bufnr, first, last)
@@ -334,22 +335,22 @@ function Tracker:update()
 					}
 
 					-- Override highlight settings.
-					mark_config = vim.tbl_extend("force", mark_config, self.config.highlight(match))
+					mark_config = vim.tbl_extend("force", mark_config, self._config.highlight(match))
 
-					if i == self.current then
+					if i == self._current then
 						mark_config.line_hl_group = "Visual"
 					end
 
 					-- Create extmarks.
-					vim.api.nvim_buf_set_extmark(window.bufnr, self.namespace, match.lnum - 1, 0, mark_config)
+					vim.api.nvim_buf_set_extmark(window.bufnr, self._namespace, match.lnum - 1, 0, mark_config)
 
-					table.insert(self.visible_matches, match)
+					table.insert(self._visible_matches, match)
 				end
 			end
 		end
 	end
 
-	self.hooks.update(self.visible_matches)
+	self._hooks.update(self._visible_matches)
 end
 
 ---Returns all windows that currently contain one of the tracked buffers.
@@ -359,7 +360,7 @@ function Tracker:get_windows()
 	local windows = {}
 
 	for _, window in ipairs(vim.fn.getwininfo()) do
-		if self.buffers[window.bufnr] then
+		if self._buffers[window.bufnr] then
 			table.insert(windows, window)
 		end
 	end
@@ -371,38 +372,38 @@ end
 ---@return MatchList.Match? The currently selected match or nil.
 function Tracker:get_current()
 	self:get_matches()
-	return self.matches[self.current]
+	return self._matches[self._current]
 end
 
 ---Returns the index of the currently selected match.
 ---@return integer The currently selected index or 0 (if none is selected).
 function Tracker:get_current_index()
-	return self.current
+	return self._current
 end
 
 ---Returns all currently tracked matches.
 ---@return MatchList.Match[] matches The matches list.
 function Tracker:get_matches()
-	if not self.matches then
-		self.matches = {}
+	if not self._matches then
+		self._matches = {}
 
-		for buffer, _ in pairs(self.buffers) do
+		for buffer, _ in pairs(self._buffers) do
 			local groups = self:get_groups(buffer)
 
 			for _, group in ipairs(groups) do
-				local scanners = self.groups[group] or {}
+				local scanners = self._groups[group] or {}
 
 				for _, scanner in ipairs(scanners) do
 					local matches = scanner:scan(buffer)
 
 					for _, match in ipairs(matches) do
-						table.insert(self.matches, match)
+						table.insert(self._matches, match)
 					end
 				end
 			end
 		end
 
-		table.sort(self.matches, function(a, b)
+		table.sort(self._matches, function(a, b)
 			if a.buffer ~= b.buffer then
 				return a.buffer < b.buffer
 			else
@@ -410,18 +411,18 @@ function Tracker:get_matches()
 			end
 		end)
 
-		for i, match in ipairs(self.matches) do
+		for i, match in ipairs(self._matches) do
 			match.index = i
 		end
 	end
 
-	return self.matches
+	return self._matches
 end
 
 ---Returns all currently visible matches.
 ---@return MatchList.Match[] matches The matches list.
 function Tracker:get_visible_matches()
-	return self.visible_matches
+	return self._visible_matches
 end
 
 ---Default notification function.
@@ -484,8 +485,8 @@ function Tracker:goto_match(match, config)
 
 		if match.index ~= nil then
 			self:get_matches()
-			self.current = match.index
-			config.notify(match, self.current, #self.matches)
+			self._current = match.index
+			config.notify(match, self._current, #self._matches)
 		end
 	else
 		config.notify()
@@ -504,13 +505,13 @@ function Tracker:skip(amount, config)
 	config = vim.tbl_extend("force", def_config, config or {})
 	self:get_matches()
 
-	local new_index = self.current + amount
+	local new_index = self._current + amount
 
-	while new_index >= 1 and new_index <= #self.matches do
-		local match = self.matches[new_index]
+	while new_index >= 1 and new_index <= #self._matches do
+		local match = self._matches[new_index]
 
 		if config.filter(match) then
-			self.current = new_index
+			self._current = new_index
 			self:goto_match(match, config)
 			return match
 		else
@@ -540,7 +541,7 @@ end
 ---@return MatchList.Match? match The match found or `nil`.
 function Tracker:first(config)
 	self:get_matches()
-	self.current = 0
+	self._current = 0
 	return self:next(config)
 end
 
@@ -549,20 +550,20 @@ end
 ---@return MatchList.Match? match The match found or `nil`.
 function Tracker:last(config)
 	self:get_matches()
-	self.current = #self.matches + 1
+	self._current = #self._matches + 1
 	return self:prev(config)
 end
 
 ---Resets the current item selection.
 function Tracker:unselect()
-	self.current = 0
+	self._current = 0
 	self:schedule_update(true)
 end
 
 ---Sets the update hook function.
 ---the update hook is called after every ui update.
 function Tracker:set_update_hook(fun)
-	self.hooks.update = fun
+	self._hooks.update = fun
 end
 
 return M
