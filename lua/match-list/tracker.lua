@@ -9,20 +9,29 @@ local UPDATE_TIMEOUT = 25
 ---@class MatchList.Tracker.Hooks Hooks for the tracker.
 ---@field update fun(visible_matches: MatchList.Match[]) Called after update.
 
----@alias MatchList.Tracker.FilterFun fun(match: MatchList.Match): boolean A filter function for matches.
+---@alias MatchList.Tracker.FilterFun fun(match: MatchList.Match): boolean? A filter function for matches.
 ---@alias MatchList.Tracker.NotifyFun fun(match: MatchList.Match?, index: integer?, total: integer?) Notification function.
+---@alias MatchList.Tracker.LoadFun fun(match: MatchList.Match): boolean? Function to load a file for a match.
+---@alias MatchList.Tracker.OpenFun fun(match: MatchList.Match): integer? Function to open a window for a match.
 ---
 ---@class MatchList.Tracker.GotoConfig
 ---@field filter MatchList.Tracker.FilterFun? Filter function for matches.
 ---@field notify MatchList.Tracker.NotifyFun? Notify function on navigation.
----@field focus boolean? `true` to switch to the window selected for showing the match.
----@field reuse boolean? `true` to reuse any open window that has the buffer already open.
----@field window integer? The window to open the match in (0 or `nil` for the current window).
+---@field file_window integer? The window to open the target file in. `nil` to not open the target file, `0` to open in the file window, `id` to open it in a specific window.
+---@field file_open MatchList.Tracker.OpenFun? If the file window is not available, this is called to open or select window for the target file.
+---@field file_load MatchList.Tracker.LoadFun? Function used to open a buffer for the given match in the current window.
+---@field match_window integer? The window to open the match in. `nil` to not open the match, `0` to open in any existing window, `id` to open it in a specific window.
+---@field match_open MatchList.Tracker.OpenFun? If the match buffer is not currently open, this is called to open or select a window for it.
+---@field focus string Specifies where the focus should end up. `nil` to leave the focus unchanged, `file` to focus on the opened file, `match` to focus on the match.
 
 ---@alias MatchList.Tracker.HighlightFun fun(match: MatchList.Match): vim.api.keyset.set_extmark
+---@alias MatchList.Tracker.AttachFun fun(buffer: integer, tracker: MatchList.Tracker)
+---@alias MatchList.Tracker.DetachFun fun(buffer: integer, tracker: MatchList.Tracker)
 
 ---@class MatchList.Tracker.Config
 ---@field highlight MatchList.Tracker.HighlightFun? Hook for customizing highlights.
+---@field attach MatchList.Tracker.AttachFun? Function to run when attaching.
+---@field detach MatchList.Tracker.DetachFun? Function to run when detaching.
 
 ---@class MatchList.Tracker Tracks and highlights matches in buffers.
 ---@field _namespace integer The namespace used for extmarks.
@@ -33,6 +42,7 @@ local UPDATE_TIMEOUT = 25
 ---@field _matches MatchList.Match[]? The cached list of matches.
 ---@field _visible_matches MatchList.Match[] The list of visible matches.
 ---@field _scheduled boolean `true` if an update has been scheduled.
+---@field _file_window integer The cached file window or -1.
 ---@field _update_time integer The timestamp of the last update.
 ---@field _update_timer uv.uv_timer_t? The update timer ID.
 ---@field _current integer The currently selected index.
@@ -58,12 +68,22 @@ function M.new(config)
 				sign_hl_group = highlight[type] or "DiagnosticSignHint",
 				line_hl_group = highlight[type] or "DiagnosticSignHint",
 			}
-		end
+		end,
+		attach = function(buffer, tracker)
+			vim.keymap.set("n", "<cr>", function()
+				tracker:goto_below_cursor()
+			end, { buffer = buffer })
+		end,
+		detach = function(buffer)
+			vim.keymap.del("n", "<cr>", {
+				buffer = buffer,
+			})
+		end,
 	}
 
 	config = vim.tbl_extend("force", def_config, config or {})
 
-	local ui = {
+	local tracker = {
 		_namespace = vim.api.nvim_create_namespace(""),
 		_config = config,
 		_buffers = {},
@@ -72,6 +92,7 @@ function M.new(config)
 		_matches = nil,
 		_visible_matches = {},
 		_scheduled = false,
+		_file_window = -1,
 		_update_time = vim.uv.now(),
 		_update_timer = nil,
 		_current = 0,
@@ -88,16 +109,16 @@ function M.new(config)
 
 			-- Schedule an update if any of the scrolled windows show our buffer.
 			for _, window in ipairs(windows) do
-				if ui.buffers[window.bufnr] and changes[tostring(window.winid)] then
-					ui:schedule_update()
+				if tracker._buffers[window.bufnr] and changes[tostring(window.winid)] then
+					tracker:schedule_update()
 					break
 				end
 			end
 		end
 	})
 
-	setmetatable(ui, Tracker)
-	return ui
+	setmetatable(tracker, Tracker)
+	return tracker
 end
 
 ---Updates the match groups.
@@ -191,22 +212,22 @@ function Tracker:attach(buffer)
 		self._buffers[buffer] = {}
 
 		-- Schedule an update if our buffer changes.
-		local ui = self
+		local tracker = self
 
 		vim.api.nvim_buf_attach(buffer, false, {
 			on_reload = function()
-				if ui._buffers[buffer] then
-					ui:schedule_update()
-					ui._matches = nil
+				if tracker._buffers[buffer] then
+					tracker:schedule_update()
+					tracker._matches = nil
 				else
 					-- detach
 					return true
 				end
 			end,
 			on_lines = function()
-				if ui._buffers[buffer] then
-					ui:schedule_update()
-					ui._matches = nil
+				if tracker._buffers[buffer] then
+					tracker:schedule_update()
+					tracker._matches = nil
 				else
 					-- detach
 					return true
@@ -214,8 +235,10 @@ function Tracker:attach(buffer)
 			end,
 		})
 
-		ui:schedule_update(true)
-		ui._matches = nil
+		self._config.attach(buffer, self)
+
+		tracker:schedule_update(true)
+		tracker._matches = nil
 	end
 end
 
@@ -229,6 +252,8 @@ function Tracker:detach(buffer)
 	if self._buffers[buffer] then
 		vim.api.nvim_buf_clear_namespace(buffer, self._namespace, 0, -1)
 		self._buffers[buffer] = nil
+
+		self._config.detach(buffer, self)
 		self:schedule_update(true)
 	end
 end
@@ -245,7 +270,7 @@ function Tracker:schedule_update(now)
 
 	-- This will limit the amount of updates to only one update per `update_timeout`.
 	if not self._scheduled then
-		local ui = self
+		local tracker = self
 		self._scheduled = true
 
 		local elapsed = vim.uv.now() - self._update_time
@@ -256,9 +281,9 @@ function Tracker:schedule_update(now)
 		end
 
 		self._update_timer = vim.defer_fn(function()
-			ui:update()
-			ui._scheduled = false
-			ui._update_time = vim.uv.now()
+			tracker:update()
+			tracker._scheduled = false
+			tracker._update_time = vim.uv.now()
 		end, wait)
 	end
 end
@@ -439,57 +464,149 @@ end
 ---@param config MatchList.Tracker.GotoConfig? The navigation config.
 function Tracker:goto_match(match, config)
 	local def_config = {
-		focus = false,
-		reuse = true,
-		window = nil,
 		notify = default_notify,
+		file_window = 0,
+		file_open = function()
+			return vim.api.nvim_open_win(0, false, {
+				split = "above",
+			})
+		end,
+		file_load = function(file_match)
+			local file = file_match.data["file"]
+
+			if vim.fn.filereadable(file) == 1 then
+				vim.cmd("silent edit " .. file)
+				return true
+			end
+		end,
+		match_window = 0,
+		match_open = function()
+			return vim.api.nvim_open_win(0, false, {
+				split = "below",
+			})
+		end,
+		focus = "file",
 	}
 
 	config = vim.tbl_extend("force", def_config, config or {})
 
 	if match then
-		local use_window = -1
+		local file_window = config.file_window
+		local match_window = config.match_window
 
-		-- If window reuse is enabled, first try to find an open window for the buffer.
-		if config.reuse then
-			local windows = self:get_windows()
+		if file_window == 0 then
+			-- Select the current window as the file window.
+			file_window = vim.api.nvim_get_current_win()
+		end
 
-			for _, window in ipairs(windows) do
+		-- Disable the file window, if we have no file information.
+		if not match.data["file"] then
+			file_window = nil
+		end
+
+		if match_window == 0 then
+			-- Try to find an open match window that is not the file window.
+			for _, window in ipairs(self:get_windows()) do
 				if window.bufnr == match.buffer then
-					use_window = window.winid
-					break
+					match_window = window.winid
+
+					if match_window ~= file_window then
+						break
+					end
 				end
 			end
 		end
 
-		if not vim.api.nvim_win_is_valid(use_window) then
-			-- Use the window specified.
-			if config.window then
-				use_window = config.window
-			end
-
-			-- Fall back to the current window.
-			if not vim.api.nvim_win_is_valid(use_window) then
-				use_window = vim.api.nvim_get_current_win()
+		if match_window == file_window then
+			-- Select a different file window on conflict.
+			if vim.api.nvim_win_is_valid(self._file_window) and self._file_window ~= match_window then
+				-- Fall back to the previously used window.
+				file_window = self._file_window
+			else
+				-- Open a new window for the file.
+				file_window = config.file_open(match)
 			end
 		end
 
-		vim.api.nvim_win_set_buf(use_window, match.buffer)
-		vim.api.nvim_win_set_cursor(use_window, { match.lnum, 0 })
+		local old_win = vim.api.nvim_get_current_win()
 
-		if config.focus then
-			vim.api.nvim_set_current_win(use_window)
+		if file_window and vim.api.nvim_win_is_valid(file_window) then
+			-- Remember the file window.
+			self._file_window = file_window
+			vim.api.nvim_set_current_win(file_window)
+
+			if config.file_load(match) then
+				local lnum = tonumber(match.data["lnum"])
+				local col = tonumber(match.data["col"]) or 0
+
+				if lnum then
+					vim.api.nvim_win_set_cursor(0, { lnum, col })
+				end
+			else
+				vim.notify("Could not open file " .. match.data["file"])
+			end
 		end
 
-		self:schedule_update(true)
+		if match_window and vim.api.nvim_win_is_valid(match_window) then
+			-- No match window found?
+			if match_window == 0 then
+				match_window = config.match_open(match)
+			end
+
+			if vim.api.nvim_win_is_valid(match_window) then
+				vim.api.nvim_win_set_buf(match_window, match.buffer)
+				vim.api.nvim_win_set_cursor(match_window, { match.lnum, 0 })
+			end
+		end
+
+		-- Set the new focus.
+		if config.focus == "file" then
+			if file_window and vim.api.nvim_win_is_valid(file_window) then
+				vim.api.nvim_set_current_win(file_window)
+			end
+		elseif config.focus == "match" then
+			if match_window and vim.api.nvim_win_is_valid(match_window) then
+				vim.api.nvim_set_current_win(match_window)
+			end
+		else
+			vim.api.nvim_set_current_win(old_win)
+		end
 
 		if match.index ~= nil then
 			self:get_matches()
 			self._current = match.index
 			config.notify(match, self._current, #self._matches)
 		end
+
+		self:schedule_update(true)
 	else
 		config.notify()
+	end
+end
+
+---Finds the match item below the cursor and navigates to it.
+---@param config MatchList.Tracker.GotoConfig? The navigation config.
+---@return MatchList.Match? match The match found or `nil`.
+function Tracker:goto_below_cursor(config)
+	local buffer = vim.api.nvim_get_current_buf()
+	local cursor = vim.api.nvim_win_get_cursor(0)
+	local lnum = cursor[1]
+
+	self:get_matches()
+
+	-- Use the current window as the match window.
+	config = config or {}
+	config.match_window = vim.api.nvim_get_current_win()
+
+	-- Try to find a matching item.
+	for _, match in ipairs(self._matches) do
+		local first = match.lnum
+		local last = match.lnum + match.lines - 1
+
+		if match.buffer == buffer and lnum >= first and lnum <= last then
+			self:goto_match(match, config)
+			return match
+		end
 	end
 end
 
@@ -519,7 +636,17 @@ function Tracker:skip(amount, config)
 		end
 	end
 
-	self:goto_match(nil, config )
+	-- Try to go to the current item again.
+	if self._current >= 1 and self._current <= #self._matches then
+		local match = self._matches[self._current]
+
+		if config.filter(match) then
+			self:goto_match(match, config)
+			return match
+		end
+	end
+
+	self:goto_match(nil, config)
 end
 
 ---Moves to the next item.
