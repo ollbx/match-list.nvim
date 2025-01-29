@@ -25,7 +25,7 @@ describe("match-list.scanner", function()
 
 		-- Try a filter function.
 		scanner = Scanner.new_regex(expr, { "count" }, function(data)
-			local count = tonumber(data.count)
+			local count = tonumber(data["count"])
 
 			if count > 15 then
 				return { count = count * 2, type = "info" }
@@ -53,7 +53,7 @@ describe("match-list.scanner", function()
 
 		-- Try a filter function.
 		scanner = Scanner.new_match(expr, { "count" }, function(data)
-			local count = tonumber(data.count)
+			local count = tonumber(data["count"])
 
 			if count > 15 then
 				return { count = count * 2, type = "info" }
@@ -82,7 +82,7 @@ describe("match-list.scanner", function()
 
 		-- Try a filter function.
 		scanner = Scanner.new_lpeg(expr, { "count" }, function(data)
-			local count = tonumber(data.count)
+			local count = tonumber(data["count"])
 
 			if count > 15 then
 				return { count = count * 2, type = "info" }
@@ -123,5 +123,43 @@ describe("match-list.scanner", function()
 		-- If the first line is not in range, nothing should match.
 		matches = scanner:scan(buffer, 1, 2)
 		assert.are.same({}, matches)
+	end)
+
+	it("should support filters", function()
+		local buffer = Util.make_buffer(lines)
+
+		local scanner = Scanner.new_multi_line {
+			Scanner.new_regex([[this \(.*\)]], { "message" }),
+			Scanner.new_match([[this (.*)]], { "+:message" }),
+		}
+
+		local expect = {
+			buffer = buffer,
+			lines = 2,
+			lnum = 1,
+			data = { message = "is a test lineis another line" },
+		}
+
+		assert.are.same(2, scanner:get_lines())
+
+		local matches = scanner:scan(buffer)
+		assert.are.same({ expect }, matches)
+
+		scanner = Scanner.new_multi_line {
+			Scanner.new_regex([[this \(.*\)]], { "message" }),
+			Scanner.new_match([[this (.*)]], { "+,:message" }),
+		}
+
+		expect = {
+			buffer = buffer,
+			lines = 2,
+			lnum = 1,
+			data = { message = "is a test line,is another line" },
+		}
+
+		assert.are.same(2, scanner:get_lines())
+
+		matches = scanner:scan(buffer)
+		assert.are.same({ expect }, matches)
 	end)
 end)

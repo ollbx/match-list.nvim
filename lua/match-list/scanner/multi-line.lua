@@ -1,15 +1,17 @@
 local M = {}
 
 ---@class MatchList.MultiLineScanner: MatchList.Scanner
----@field lines MatchList.Scanner[] Scanners for each consecutive line.
----@filed line_count integer The number of lines matched.
+---@field _lines MatchList.Scanner[] Scanners for each consecutive line.
+---@field _line_count integer The number of lines matched.
+---@field _filter MatchList.FilterFun A filter function.
 local MultiLineScanner = {}
 MultiLineScanner.__index = MultiLineScanner
 
 ---Creates a new multi-line scanner.
 ---@param lines MatchList.Scanner[] Scanners for each consecutive line.
+---@param filter MatchList.FilterFun? A filter function.
 ---@return MatchList.MultiLineScanner scanner The scanner.
-function M.new(lines)
+function M.new(lines, filter)
 	local line_count = 0
 
 	for _, scanner in ipairs(lines) do
@@ -17,8 +19,9 @@ function M.new(lines)
 	end
 
 	local scanner = {
-		lines = lines,
-		line_count = line_count,
+		_lines = lines,
+		_line_count = line_count,
+		_filter = filter or function(v) return v end,
 	}
 
 	if #lines < 1 then
@@ -41,10 +44,10 @@ end
 ---@return MatchList.Match[] matches The found matches.
 function MultiLineScanner:scan(buffer, first, last)
 	-- Scan with the first scanner.
-	local matches = self.lines[1]:scan(buffer, first, last)
+	local matches = self._lines[1]:scan(buffer, first, last)
 
 	-- If we only have one line, we are done here.
-	if #self.lines <= 1 then
+	if #self._lines <= 1 then
 		return matches
 	end
 
@@ -54,9 +57,9 @@ function MultiLineScanner:scan(buffer, first, last)
 		local lnum = match.lnum + 1
 		local success = true
 
-		for i=2,#self.lines do
+		for i=2,#self._lines do
 			-- Note: multi-line matches only need their first line in-range.
-			local next_matches = self.lines[i]:scan(buffer, lnum, lnum)
+			local next_matches = self._lines[i]:scan(buffer, lnum, lnum, match.data)
 			local next_match = next_matches[1]
 
 			if next_match then
@@ -64,8 +67,8 @@ function MultiLineScanner:scan(buffer, first, last)
 				match.lines = match.lines + next_match.lines
 				lnum = lnum + next_match.lines
 
-				-- Extend the captured data.
-				match.data = vim.tbl_extend("force", match.data, next_match.data)
+				-- Take over the extended match data.
+				match.data = next_match.data
 			else
 				success = false
 				break
@@ -73,7 +76,12 @@ function MultiLineScanner:scan(buffer, first, last)
 		end
 
 		if success then
-			table.insert(result, match)
+			local filter_data = self._filter(match.data)
+
+			if filter_data then
+				match.data = filter_data
+				table.insert(result, match)
+			end
 		end
 	end
 
@@ -82,7 +90,7 @@ end
 
 ---Returns the number of lines matched.
 function MultiLineScanner:get_lines()
-	return self.line_count
+	return self._line_count
 end
 
 return M

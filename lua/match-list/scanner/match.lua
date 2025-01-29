@@ -1,22 +1,22 @@
 local M = {}
 
 ---@class MatchList.MatchScanner: MatchList.Scanner
----@field pattern string The match string to scan for.
----@field groups string[] The names of the matched groups.
----@field postproc MatchList.PostProcFun A post-processing function.
+---@field _pattern string The match string to scan for.
+---@field _groups string[] The names of the matched groups.
+---@field _filter MatchList.FilterFun A filter function.
 local MatchScanner = {}
 MatchScanner.__index = MatchScanner
 
 ---Creates a new lua pattern scanner.
 ---@param pattern string The match string to scan for.
 ---@param groups string[]? The names for the matched groups.
----@param postproc MatchList.PostProcFun? A post-processing function.
+---@param filter MatchList.FilterFun? A filter function.
 ---@return MatchList.MatchScanner scanner The scanner.
-function M.new(pattern, groups, postproc)
+function M.new(pattern, groups, filter)
 	local scanner = {
-		pattern = pattern,
-		groups = groups or {},
-		postproc = postproc or function(v) return v end,
+		_pattern = pattern,
+		_groups = groups or {},
+		_filter = filter or function(v) return v end,
 	}
 
 	setmetatable(scanner, MatchScanner)
@@ -28,37 +28,27 @@ end
 ---@param buffer integer The buffer to scan.
 ---@param first integer|nil The first row to scan. `nil` for row 1.
 ---@param last integer|nil The last row to scan. `nil` for the last row.
+---@param base_data MatchList.MatchData? Base match data to extend.
 ---@return MatchList.Match[] matches The found matches.
-function MatchScanner:scan(buffer, first, last)
+function MatchScanner:scan(buffer, first, last, base_data)
 	local Util = require("match-list.util")
 	local result = {}
 
 	buffer = buffer or vim.api.nvim_get_current_buf()
 
 	Util.iterate_lines(buffer, first, last, nil, function(line, lnum)
-		local match = { string.match(line, self.pattern) }
+		local match = { string.match(line, self._pattern) }
 
 		if match[1] ~= nil then
-			local data = {}
+			local data = Util.unfold_groups(self._groups, match, base_data)
+			local filter_data = self._filter(data)
 
-			for i, group in ipairs(self.groups) do
-				data[group] = match[i]
-			end
-
-			for key, value in pairs(self.groups) do
-				if type(key) ~= "number" then
-					data[key] = value
-				end
-			end
-
-			local new_data = self.postproc(data)
-
-			if new_data then
+			if filter_data then
 				table.insert(result, {
 					buffer = buffer,
 					lines = 1,
 					lnum = lnum,
-					data = new_data
+					data = filter_data
 				})
 			end
 		end

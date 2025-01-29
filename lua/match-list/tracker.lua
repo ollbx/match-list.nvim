@@ -32,6 +32,7 @@ local UPDATE_TIMEOUT = 25
 ---@field highlight MatchList.Tracker.HighlightFun? Hook for customizing highlights.
 ---@field attach MatchList.Tracker.AttachFun? Function to run when attaching.
 ---@field detach MatchList.Tracker.DetachFun? Function to run when detaching.
+---@field split string "horizontal", "vertical", "h" or "v".
 
 ---@class MatchList.Tracker Tracks and highlights matches in buffers.
 ---@field _namespace integer The namespace used for extmarks.
@@ -46,6 +47,7 @@ local UPDATE_TIMEOUT = 25
 ---@field _update_time integer The timestamp of the last update.
 ---@field _update_timer uv.uv_timer_t? The update timer ID.
 ---@field _current integer The currently selected index.
+---@field _current_match MatchList.Match? The current match.
 ---@field _hooks MatchList.Tracker.Hooks Hook functions.
 local Tracker = {}
 Tracker.__index = Tracker
@@ -96,6 +98,7 @@ function M.new(config)
 		_update_time = vim.uv.now(),
 		_update_timer = nil,
 		_current = 0,
+		_current_match = nil,
 		_hooks = {
 			update = function() end,
 		}
@@ -352,7 +355,7 @@ function Tracker:update()
 			for _, scanner in ipairs(scanners) do
 				local matches = scanner:scan(window.bufnr, first, last)
 
-				for i, match in ipairs(matches) do
+				for _, match in ipairs(matches) do
 					local type = match.data["type"] or "hint"
 
 					local mark_config = {
@@ -367,7 +370,7 @@ function Tracker:update()
 					-- Override highlight settings.
 					mark_config = vim.tbl_extend("force", mark_config, self._config.highlight(match))
 
-					if i == self._current then
+					if self._current_match and self._current_match.lnum == match.lnum and self._current_match.buffer == window.bufnr then
 						mark_config.line_hl_group = "Visual"
 					end
 
@@ -401,8 +404,7 @@ end
 ---Returns the currently selected match.
 ---@return MatchList.Match? The currently selected match or nil.
 function Tracker:get_current()
-	self:get_matches()
-	return self._matches[self._current]
+	return self._current_match
 end
 
 ---Returns the index of the currently selected match.
@@ -464,6 +466,20 @@ local function default_notify(match, index, total)
 	end
 end
 
+local split_file = {
+	horizontal = "above",
+	vertical = "right",
+	h = "above",
+	v = "right",
+}
+
+local split_match = {
+	horizontal = "below",
+	vertical = "left",
+	h = "below",
+	v = "left",
+}
+
 ---Navigates to the specified match.
 ---@param match MatchList.Match? The match to scroll to.
 ---@param config MatchList.Tracker.GotoConfig? The navigation config.
@@ -473,7 +489,7 @@ function Tracker:goto_match(match, config)
 		file_window = 0,
 		file_open = function()
 			return vim.api.nvim_open_win(0, false, {
-				split = "above",
+				split = split_file[self._config.split] or "above",
 			})
 		end,
 		file_load = function(file_match)
@@ -487,7 +503,7 @@ function Tracker:goto_match(match, config)
 		match_window = 0,
 		match_open = function()
 			return vim.api.nvim_open_win(0, false, {
-				split = "below",
+				split = split_match[self._config.split] or "below",
 			})
 		end,
 		focus = "file",
@@ -542,7 +558,7 @@ function Tracker:goto_match(match, config)
 
 			if config.file_load(match) then
 				local lnum = tonumber(match.data["lnum"])
-				local col = tonumber(match.data["col"]) or 0
+				local col = (tonumber(match.data["col"]) or 1) - 1
 
 				if lnum then
 					vim.api.nvim_win_set_cursor(0, { lnum, col })
@@ -580,6 +596,7 @@ function Tracker:goto_match(match, config)
 		if match.index ~= nil then
 			self:get_matches()
 			self._current = match.index
+			self._current_match = match
 			config.notify(match, self._current, #self._matches)
 		end
 
@@ -634,6 +651,7 @@ function Tracker:skip(amount, config)
 
 		if config.filter(match) then
 			self._current = new_index
+			self._current_match = match
 			self:goto_match(match, config)
 			return match
 		else
@@ -642,8 +660,8 @@ function Tracker:skip(amount, config)
 	end
 
 	-- Try to go to the current item again.
-	if self._current >= 1 and self._current <= #self._matches then
-		local match = self._matches[self._current]
+	if self._current_match then
+		local match = self._current_match
 
 		if config.filter(match) then
 			self:goto_match(match, config)
@@ -689,6 +707,7 @@ end
 ---Resets the current item selection.
 function Tracker:unselect()
 	self._current = 0
+	self._current_match = nil
 	self:schedule_update(true)
 end
 
