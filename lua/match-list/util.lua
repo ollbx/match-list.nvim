@@ -36,6 +36,50 @@ function M.iterate_lines(buffer, first, last, chunk, fun)
 	end
 end
 
+---Creates a map from a group configuration and a list of values.
+---@param groups table The group configuration.
+---@param match string[] The list of matched values.
+---@param base_data MatchList.MatchData? The base match data to extend.
+---@return MatchList.MatchData data The match data.
+function M.unfold_groups(groups, match, base_data)
+	local data = vim.deepcopy(base_data or {})
+
+	for i, group in ipairs(groups) do
+		local index = string.find(group, ":")
+
+		if index then
+			-- Process "[flags]:[group]".
+			local flags = string.sub(group, 1, index - 1)
+			local name = string.sub(group, index + 1)
+			local tag = string.sub(flags, 1, 1)
+
+			if tag == "+" then
+				local sep = string.sub(flags, 2, 2)
+
+				if data[name] then
+					data[name] = data[name] .. sep .. match[i]
+				else
+					data[name] = match[i]
+				end
+			else
+				error("Invalid group flags: \"" .. flags .. "\"")
+			end
+		else
+			-- Process "[group]".
+			data[group] = match[i]
+		end
+	end
+
+	-- Process direct a = b value assignments.
+	for key, value in pairs(groups) do
+		if type(key) ~= "number" then
+			data[key] = value
+		end
+	end
+
+	return data
+end
+
 ---Creates a new scratch buffer with the given content.
 ---@param lines string[] The lines for the buffer.
 ---@return integer buffer The ID of the buffer.

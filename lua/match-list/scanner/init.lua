@@ -2,7 +2,7 @@
 -- They can match single or multiple lines.
 
 ---@class MatchList.Scanner
----@field scan fun(self: MatchList.Scanner, buffer: integer, first: integer?, last: integer?): [MatchList.Match]
+---@field scan fun(self: MatchList.Scanner, buffer: integer, first: integer?, last: integer?, base_data: MatchList.MatchData?): [MatchList.Match]
 ---@field get_lines fun(): integer
 
 ---@alias MatchList.MatchData { string: string }
@@ -14,7 +14,7 @@
 ---@field lnum integer The line number of the match.
 ---@field data MatchList.MatchData The captured data of the match.
 
----@alias MatchList.PostProcFun fun(data: MatchList.MatchData): MatchList.MatchData?
+---@alias MatchList.FilterFun fun(data: MatchList.MatchData): MatchList.MatchData?
 
 local M = {
 	new_eval = require("match-list.scanner.eval").new,
