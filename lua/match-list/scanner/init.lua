@@ -40,11 +40,7 @@ function M.parse(config)
 	if type(config) == "function" then
 		return M.new_eval(config)
 	elseif type(config) == "string" then
-		return M.new_eval(function(line)
-			if line == config then
-				return {}
-			end
-		end)
+		return M.new_regex(config)
 	elseif config["regex"] then
 		local groups = (config["groups"] or config[1]) or {}
 		check_groups(groups)
