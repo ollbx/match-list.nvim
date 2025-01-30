@@ -152,6 +152,33 @@ The results produced by all _scanners_ are combined into a single _match item_.
 producing any output, you can just pass a single string for that line, instead
 of using a table.
 
+### Continuation lines
+
+Sometimes you may want to collect multiple lines of input into a single output
+value. For example you may want to match a two-line error output:
+
+```lua
+{
+    { [[error: \(.*\)]], { "message" } },
+    { [[error: \(.*\)]], { "message" } },
+}
+```
+
+In this case, the second match on `"message"` will overwrite the first one,
+leaving you with the output of the second line only. You can add _flags_ to
+the group name, to customize this behavior:
+
+```lua
+{
+    { [[error: \(.*\)]], { "message" } },
+    { [[error: \(.*\)]], { "+:message" } },
+}
+```
+
+Specifying `"+:message"`, will append the new value to the existing `message`,
+so that no data is lost. Note that you can also specify a separator character.
+For example `"+,:message"` will comma-separate the data from the two lines.
+
 ## Filter functions
 
 Sometimes you may want to do some post-processing on the data produced by the
