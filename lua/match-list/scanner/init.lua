@@ -4,6 +4,9 @@
 ---@class MatchList.Scanner
 ---@field scan fun(self: MatchList.Scanner, buffer: integer, first: integer?, last: integer?, base_data: MatchList.MatchData?): [MatchList.Match]
 ---@field get_lines fun(): integer
+---@field _groups string[] The names of the matched groups.
+---@field _filter MatchList.FilterFun A filter function.
+---@field _priority integer The match priority.
 
 ---@alias MatchList.MatchData { string: string }
 
@@ -25,12 +28,6 @@ local M = {
 	new_multi_line = require("match-list.scanner.multi-line").new,
 }
 
-local function check_groups(groups)
-	if type(groups) ~= "table" then
-		error("Expected table for groups. Found: " .. vim.inspect(groups))
-	end
-end
-
 ---@alias MatchList.MatchFun fun(string): MatchList.MatchData?
 ---@alias MatchList.ScannerConfig MatchList.MatchFun|string|table
 ---@alias MatchList.GroupConfig { string: MatchList.ScannerConfig[] }
@@ -42,34 +39,62 @@ function M.parse(config)
 		return M.new_eval(config)
 	elseif type(config) == "string" then
 		return M.new_regex(config)
-	elseif config["regex"] then
-		local groups = (config["groups"] or config[1]) or {}
-		check_groups(groups)
-		return M.new_regex(config["regex"], groups, config["filter"], config["priority"])
-	elseif config["match"] then
-		local groups = (config["groups"] or config[1]) or {}
-		check_groups(groups)
-		return M.new_match(config["match"], groups, config["filter"], config["priority"])
-	elseif config["lpeg"] then
-		local groups = (config["groups"] or config[1]) or {}
-		check_groups(groups)
-		return M.new_lpeg(config["lpeg"], groups, config["filter"], config["priority"])
-	elseif config["eval"] then
-		return M.new_eval(config["eval"])
-	elseif type(config[1]) == "string" then
-		local groups = (config["groups"] or config[2]) or {}
-		check_groups(groups)
-		return M.new_regex(config[1], groups, config["filter"], config["priority"])
-	elseif type(config[1]) == "function" then
-		return M.new_eval(config[1], config["priority"])
-	elseif type(config[1]) == "table" then
-		local lines = {}
+	elseif type(config) == "table" then
+		local scanner
+		local group_index
 
-		for _, line in ipairs(config) do
-			table.insert(lines, M.parse(line))
+		if config["regex"] then
+			scanner = M.new_regex(config["regex"])
+			group_index = 1
+		elseif config["match"] then
+			scanner = M.new_match(config["match"])
+			group_index = 1
+		elseif config["lpeg"] then
+			scanner = M.new_lpeg(config["lpeg"])
+			group_index = 1
+		elseif config["eval"] then
+			scanner = M.new_eval(config["eval"])
+			group_index = 1
+		elseif type(config[1]) == "string" then
+			scanner = M.new_regex(config[1])
+			group_index = 2
+		elseif type(config[1]) == "function" then
+			scanner = M.new_eval(config[1])
+			group_index = 2
+		elseif type(config[1]) == "table" then
+			local lines = {}
+
+			for _, line in ipairs(config) do
+				table.insert(lines, M.parse(line))
+			end
+
+			scanner = M.new_multi_line(lines)
 		end
 
-		return M.new_multi_line(lines, config["priority"])
+		if not scanner then
+			error("Invalid scanner config: " .. vim.inspect(config))
+		end
+
+		if group_index then
+			scanner._groups = (config["groups"] or config[group_index]) or {}
+
+			if type(scanner._groups) ~= "table" then
+				error("Invalid groups. Expected table, found: " .. vim.inspect(scanner._groups))
+			end
+		end
+
+		scanner._priority = config["priority"] or 0
+		scanner._filter = config["filter"] or function(v) return v end
+
+		if type(scanner._priority) ~= "number" then
+			error("Invalid priority. Expected number, found: " .. vim.inspect(scanner._priority))
+		end
+
+		if type(scanner._filter) ~= "function" then
+			error("Invalid filter. Expected function, found: " .. vim.inspect(scanner._priority))
+		end
+
+		return scanner
 	else
 		error("Invalid scanner config: " .. vim.inspect(config))
 	end

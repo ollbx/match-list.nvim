@@ -2,24 +2,19 @@ local M = {}
 
 ---@class MatchList.RegexScanner: MatchList.Scanner
 ---@field _regex string The regex to scan for.
----@field _groups string[] The names of the matched groups.
----@field _filter MatchList.FilterFun A filter function.
----@field _priority integer The match priority.
 local RegexScanner = {}
 RegexScanner.__index = RegexScanner
 
 ---Creates a new regex scanner.
 ---@param regex string The regex to scan for.
 ---@param groups string[]? The names for the matched groups.
----@param filter MatchList.FilterFun? A filter function.
----@param priority integer? The match priority.
 ---@return MatchList.RegexScanner scanner The scanner.
-function M.new(regex, groups, filter, priority)
+function M.new(regex, groups)
 	local scanner = {
 		_regex = regex,
 		_groups = groups or {},
-		_filter = filter or function(v) return v end,
-		_priority = priority or 0,
+		_filter = function(v) return v end,
+		_priority = 0,
 	}
 
 	setmetatable(scanner, RegexScanner)

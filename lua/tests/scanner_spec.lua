@@ -14,7 +14,7 @@ describe("match-list.scanner", function()
 	it("should support regex", function()
 		local buffer = Util.make_buffer(lines)
 		local expr = [[^\(\d\+\) bottles of beer]]
-		local scanner = Scanner.new_regex(expr, { "count", type = "info" })
+		local scanner = Scanner.parse({ expr, { "count", type = "info" } })
 		local matches = scanner:scan(buffer)
 
 		assert.are.same(1, scanner:get_lines())
@@ -24,13 +24,16 @@ describe("match-list.scanner", function()
 		}, matches)
 
 		-- Try a filter function.
-		scanner = Scanner.new_regex(expr, { "count" }, function(data)
-			local count = tonumber(data["count"])
+		scanner = Scanner.parse({
+			expr, { "count" },
+			filter = function(data)
+				local count = tonumber(data["count"])
 
-			if count > 15 then
-				return { count = count * 2, type = "info" }
+				if count > 15 then
+					return { count = count * 2, type = "info" }
+				end
 			end
-		end)
+		})
 
 		matches = scanner:scan(buffer)
 
@@ -42,7 +45,7 @@ describe("match-list.scanner", function()
 	it("should support lua match", function()
 		local buffer = Util.make_buffer(lines)
 		local expr = [[^(%d+) bottles of beer]]
-		local scanner = Scanner.new_match(expr, { "count", type = "info" })
+		local scanner = Scanner.parse({ match = expr, { "count", type = "info" } })
 		local matches = scanner:scan(buffer)
 
 		assert.are.same(1, scanner:get_lines())
@@ -52,13 +55,16 @@ describe("match-list.scanner", function()
 		}, matches)
 
 		-- Try a filter function.
-		scanner = Scanner.new_match(expr, { "count" }, function(data)
-			local count = tonumber(data["count"])
+		scanner = Scanner.parse({
+			match = expr, { "count" },
+			filter = function(data)
+				local count = tonumber(data["count"])
 
-			if count > 15 then
-				return { count = count * 2, type = "info" }
+				if count > 15 then
+					return { count = count * 2, type = "info" }
+				end
 			end
-		end)
+		})
 
 		matches = scanner:scan(buffer)
 
@@ -71,7 +77,7 @@ describe("match-list.scanner", function()
 		local lpeg = require("lpeg")
 		local buffer = Util.make_buffer(lines)
 		local expr = lpeg.C(lpeg.R("09")^1) * lpeg.P(" bottles of beer")
-		local scanner = Scanner.new_lpeg(expr, { "count", type = "info" })
+		local scanner = Scanner.parse({ lpeg = expr, { "count", type = "info" } })
 		local matches = scanner:scan(buffer)
 
 		assert.are.same(1, scanner:get_lines())
@@ -81,13 +87,16 @@ describe("match-list.scanner", function()
 		}, matches)
 
 		-- Try a filter function.
-		scanner = Scanner.new_lpeg(expr, { "count" }, function(data)
-			local count = tonumber(data["count"])
+		scanner = Scanner.parse({
+			lpeg = expr, { "count" },
+			filter = function(data)
+				local count = tonumber(data["count"])
 
-			if count > 15 then
-				return { count = count * 2, type = "info" }
+				if count > 15 then
+					return { count = count * 2, type = "info" }
+				end
 			end
-		end)
+		})
 
 		matches = scanner:scan(buffer)
 
@@ -99,10 +108,10 @@ describe("match-list.scanner", function()
 	it("should support multi-line", function()
 		local buffer = Util.make_buffer(lines)
 
-		local scanner = Scanner.new_multi_line {
-			Scanner.new_regex([[^\(\d\+\) bottles of beer]], { "count" }),
-			Scanner.new_match([[no (%w+) microwaves]], { "more", type = "info" }),
-		}
+		local scanner = Scanner.parse({
+			{ [[^\(\d\+\) bottles of beer]], { "count" } },
+			{ match = [[no (%w+) microwaves]], { "more", type = "info" } },
+		})
 
 		local expect = {
 			buffer = buffer,
@@ -129,10 +138,11 @@ describe("match-list.scanner", function()
 	it("should support filters", function()
 		local buffer = Util.make_buffer(lines)
 
-		local scanner = Scanner.new_multi_line({
-			Scanner.new_regex([[this \(.*\)]], { "message" }),
-			Scanner.new_match([[this (.*)]], { "+:message" }),
-		}, nil, 1)
+		local scanner = Scanner.parse({
+			{ [[this \(.*\)]], { "message" } },
+			{ match = [[this (.*)]], { "+:message" } },
+			priority = 1,
+		})
 
 		local expect = {
 			buffer = buffer,
@@ -147,10 +157,10 @@ describe("match-list.scanner", function()
 		local matches = scanner:scan(buffer)
 		assert.are.same({ expect }, matches)
 
-		scanner = Scanner.new_multi_line {
-			Scanner.new_regex([[this \(.*\)]], { "message" }),
-			Scanner.new_match([[this (.*)]], { "+,:message" }),
-		}
+		scanner = Scanner.parse({
+			{ [[this \(.*\)]], { "message" } },
+			{ match = [[this (.*)]], { "+,:message" } },
+		})
 
 		expect = {
 			buffer = buffer,
