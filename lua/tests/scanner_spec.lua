@@ -19,8 +19,8 @@ describe("match-list.scanner", function()
 
 		assert.are.same(1, scanner:get_lines())
 		assert.are.same({
-			{ buffer = buffer, lines = 1, lnum = 3, data = { count = "12", type = "info" } },
-			{ buffer = buffer, lines = 1, lnum = 5, data = { count = "25", type = "info" } },
+			{ buffer = buffer, lines = 1, priority = 0, lnum = 3, data = { count = "12", type = "info" } },
+			{ buffer = buffer, lines = 1, priority = 0, lnum = 5, data = { count = "25", type = "info" } },
 		}, matches)
 
 		-- Try a filter function.
@@ -35,7 +35,7 @@ describe("match-list.scanner", function()
 		matches = scanner:scan(buffer)
 
 		assert.are.same({
-			{ buffer = buffer, lines = 1, lnum = 5, data = { count = 50, type = "info" } },
+			{ buffer = buffer, lines = 1, priority = 0, lnum = 5, data = { count = 50, type = "info" } },
 		}, matches)
 	end)
 
@@ -47,8 +47,8 @@ describe("match-list.scanner", function()
 
 		assert.are.same(1, scanner:get_lines())
 		assert.are.same({
-			{ buffer = buffer, lines = 1, lnum = 3, data = { count = "12", type = "info" } },
-			{ buffer = buffer, lines = 1, lnum = 5, data = { count = "25", type = "info" } },
+			{ buffer = buffer, lines = 1, priority = 0, lnum = 3, data = { count = "12", type = "info" } },
+			{ buffer = buffer, lines = 1, priority = 0, lnum = 5, data = { count = "25", type = "info" } },
 		}, matches)
 
 		-- Try a filter function.
@@ -63,7 +63,7 @@ describe("match-list.scanner", function()
 		matches = scanner:scan(buffer)
 
 		assert.are.same({
-			{ buffer = buffer, lines = 1, lnum = 5, data = { count = 50, type = "info" } },
+			{ buffer = buffer, lines = 1, priority = 0, lnum = 5, data = { count = 50, type = "info" } },
 		}, matches)
 	end)
 
@@ -76,8 +76,8 @@ describe("match-list.scanner", function()
 
 		assert.are.same(1, scanner:get_lines())
 		assert.are.same({
-			{ buffer = buffer, lines = 1, lnum = 3, data = { count = "12", type = "info" } },
-			{ buffer = buffer, lines = 1, lnum = 5, data = { count = "25", type = "info" } },
+			{ buffer = buffer, lines = 1, priority = 0, lnum = 3, data = { count = "12", type = "info" } },
+			{ buffer = buffer, lines = 1, priority = 0, lnum = 5, data = { count = "25", type = "info" } },
 		}, matches)
 
 		-- Try a filter function.
@@ -92,7 +92,7 @@ describe("match-list.scanner", function()
 		matches = scanner:scan(buffer)
 
 		assert.are.same({
-			{ buffer = buffer, lines = 1, lnum = 5, data = { count = 50, type = "info" } },
+			{ buffer = buffer, lines = 1, priority = 0, lnum = 5, data = { count = 50, type = "info" } },
 		}, matches)
 	end)
 
@@ -107,6 +107,7 @@ describe("match-list.scanner", function()
 		local expect = {
 			buffer = buffer,
 			lines = 2,
+			priority = 0,
 			lnum = 3,
 			data = { count = "12", more = "more", type = "info" },
 		}
@@ -128,14 +129,15 @@ describe("match-list.scanner", function()
 	it("should support filters", function()
 		local buffer = Util.make_buffer(lines)
 
-		local scanner = Scanner.new_multi_line {
+		local scanner = Scanner.new_multi_line({
 			Scanner.new_regex([[this \(.*\)]], { "message" }),
 			Scanner.new_match([[this (.*)]], { "+:message" }),
-		}
+		}, nil, 1)
 
 		local expect = {
 			buffer = buffer,
 			lines = 2,
+			priority = 1,
 			lnum = 1,
 			data = { message = "is a test lineis another line" },
 		}
@@ -153,6 +155,7 @@ describe("match-list.scanner", function()
 		expect = {
 			buffer = buffer,
 			lines = 2,
+			priority = 0,
 			lnum = 1,
 			data = { message = "is a test line,is another line" },
 		}

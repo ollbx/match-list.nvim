@@ -34,7 +34,7 @@ function M.open()
 			"error: This is a test error line.",
 			"file: some_testfile.txt:123",
 			"",
-			"error: This is another test error line.",
+			"fatal error: This is another test error line.",
 			"",
 			"This is a normal line.",
 			"warning: This is a warning line.",
@@ -62,12 +62,17 @@ function M.open()
 			"	default = {",
 			"		{ [[\\(error\\|warning\\): \\(.*\\)]], { \"type\", \"message\" } },",
 			"	},",
+			"	priority = {",
+			"		{ [[\\(error\\|warning\\): \\(.*\\)]], { \"type\", \"message\", fatal = false } },",
+			"		{ [[fatal error: \\(.*\\)]], { type = \"error\", \"message\", fatal = true }, priority = 1 },",
+			"	},",
 			"	multi_line = {",
 			"		{",
 			"			{ [[\\(error\\|warning\\): \\(.*\\)]], { \"type\", \"message\" } },",
-			"			function(line)",
+			"			function(line, data)",
 			"				if string.sub(line, 1, 6) == \"file: \" then",
-			"					return { filename = string.sub(line, 7) }",
+			"					data.filename = string.sub(line, 7)",
+			"					return data",
 			"				end",
 			"			end",
 			"		}",
@@ -125,6 +130,7 @@ function M.open()
 		M.tracker:attach(M.scratch_buf)
 
 		M.tracker:set_update_hook(function(matches)
+			table.sort(matches, function(a, b) return a.lnum < b.lnum end)
 			local data = vim.inspect(matches)
 
 			local win = vim.api.nvim_get_current_win()
@@ -167,10 +173,10 @@ function M.open()
 		end, { buffer = M.config_buf })
 
 		vim.keymap.set("n", "tg", function()
-			local groups = M.tracker:get_groups()
+			local groups = M.tracker:get_available_groups()
 
 			vim.ui.select(groups, {}, function(group)
-				M.tracker:select(group, false)
+				M.tracker:set_group(group)
 			end)
 		end, { buffer = M.scratch_buf })
 

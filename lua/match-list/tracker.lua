@@ -341,7 +341,7 @@ function Tracker:update()
 		lines = math.max(lines, scanner:get_lines())
 	end
 
-	self._visible_matches = {}
+	local found = {}
 
 	for _, window in ipairs(windows) do
 		-- Scan the visible area of the buffer for the given window.
@@ -356,31 +356,41 @@ function Tracker:update()
 				local matches = scanner:scan(window.bufnr, first, last)
 
 				for _, match in ipairs(matches) do
-					local type = match.data["type"] or "hint"
+					local key = match.buffer .. "-" .. match.lnum
 
-					local mark_config = {
-						end_row = match.lnum + match.lines - 2,
-						hl_eol = true,
-						hl_mode = "combine",
-						sign_text = string.upper(string.sub(type, 1, 1)),
-						sign_hl_group = "DiagnosticSignHint",
-						line_hl_group = "DiagnosticSignHint",
-					}
-
-					-- Override highlight settings.
-					mark_config = vim.tbl_extend("force", mark_config, self._config.highlight(match))
-
-					if self._current_match and self._current_match.lnum == match.lnum and self._current_match.buffer == window.bufnr then
-						mark_config.line_hl_group = "Visual"
+					if not found[key] or match.priority > found[key].priority then
+						found[key] = match
 					end
-
-					-- Create extmarks.
-					vim.api.nvim_buf_set_extmark(window.bufnr, self._namespace, match.lnum - 1, 0, mark_config)
-
-					table.insert(self._visible_matches, match)
 				end
 			end
 		end
+	end
+
+	self._visible_matches = {}
+
+	for _, match in pairs(found) do
+		local type = match.data["type"] or "hint"
+
+		local mark_config = {
+			end_row = match.lnum + match.lines - 2,
+			hl_eol = true,
+			hl_mode = "combine",
+			sign_text = string.upper(string.sub(type, 1, 1)),
+			sign_hl_group = "DiagnosticSignHint",
+			line_hl_group = "DiagnosticSignHint",
+		}
+
+		-- Override highlight settings.
+		mark_config = vim.tbl_extend("force", mark_config, self._config.highlight(match))
+
+		if self._current_match and self._current_match.lnum == match.lnum and self._current_match.buffer == match.buffer then
+			mark_config.line_hl_group = "Visual"
+		end
+
+		-- Create extmarks.
+		vim.api.nvim_buf_set_extmark(match.buffer, self._namespace, match.lnum - 1, 0, mark_config)
+
+		table.insert(self._visible_matches, match)
 	end
 
 	self._hooks.update(self._visible_matches)
@@ -417,7 +427,7 @@ end
 ---@return MatchList.Match[] matches The matches list.
 function Tracker:get_matches()
 	if not self._matches then
-		self._matches = {}
+		local found = {}
 
 		for buffer, _ in pairs(self._buffers) do
 			local groups = self:get_groups(buffer)
@@ -429,10 +439,21 @@ function Tracker:get_matches()
 					local matches = scanner:scan(buffer)
 
 					for _, match in ipairs(matches) do
-						table.insert(self._matches, match)
+						local key = match.buffer .. "-" .. match.lnum
+
+						if not found[key] or match.priority > found[key].priority then
+							found[key] = match
+						end
+
 					end
 				end
 			end
+		end
+
+		self._matches = {}
+
+		for _, match in pairs(found) do
+			table.insert(self._matches, match)
 		end
 
 		table.sort(self._matches, function(a, b)
