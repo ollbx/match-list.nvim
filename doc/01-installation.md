@@ -36,3 +36,5 @@ return {
 - You can find an overview of the configuration options under [setup](02-configuration.md).
 - For the `:MatchList` command, please refer to [command](04-command.md).
 - For the Lua API see [API](05-lua-api.md).
+- *Please note*: the plugin will only actually do anything, if you attach it to
+  a buffer, using the `:MatchList attach` command.
