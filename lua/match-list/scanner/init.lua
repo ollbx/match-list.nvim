@@ -13,6 +13,7 @@
 ---@field lines integer The number of lines matched.
 ---@field lnum integer The line number of the match.
 ---@field data MatchList.MatchData The captured data of the match.
+---@field priority integer The match priority.
 
 ---@alias MatchList.FilterFun fun(data: MatchList.MatchData): MatchList.MatchData?
 
@@ -44,23 +45,23 @@ function M.parse(config)
 	elseif config["regex"] then
 		local groups = (config["groups"] or config[1]) or {}
 		check_groups(groups)
-		return M.new_regex(config["regex"], groups, config["filter"])
+		return M.new_regex(config["regex"], groups, config["filter"], config["priority"])
 	elseif config["match"] then
 		local groups = (config["groups"] or config[1]) or {}
 		check_groups(groups)
-		return M.new_match(config["match"], groups, config["filter"])
+		return M.new_match(config["match"], groups, config["filter"], config["priority"])
 	elseif config["lpeg"] then
 		local groups = (config["groups"] or config[1]) or {}
 		check_groups(groups)
-		return M.new_lpeg(config["lpeg"], groups, config["filter"])
+		return M.new_lpeg(config["lpeg"], groups, config["filter"], config["priority"])
 	elseif config["eval"] then
 		return M.new_eval(config["eval"])
 	elseif type(config[1]) == "string" then
 		local groups = (config["groups"] or config[2]) or {}
 		check_groups(groups)
-		return M.new_regex(config[1], groups, config["filter"])
+		return M.new_regex(config[1], groups, config["filter"], config["priority"])
 	elseif type(config[1]) == "function" then
-		return M.new_eval(config[1])
+		return M.new_eval(config[1], config["priority"])
 	elseif type(config[1]) == "table" then
 		local lines = {}
 
@@ -68,7 +69,7 @@ function M.parse(config)
 			table.insert(lines, M.parse(line))
 		end
 
-		return M.new_multi_line(lines)
+		return M.new_multi_line(lines, config["priority"])
 	else
 		error("Invalid scanner config: " .. vim.inspect(config))
 	end

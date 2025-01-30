@@ -5,17 +5,20 @@ local M = {}
 ---@class MatchList.EvalScanner: MatchList.Scanner
 ---@field _eval MatchList.EvalFun The eval function.
 ---@field _filter MatchList.FilterFun A filter function.
+---@field _priority integer The match priority.
 local EvalScanner = {}
 EvalScanner.__index = EvalScanner
 
 ---Creates a new lua eval scanner.
 ---@param eval MatchList.EvalFun The eval function.
 ---@param filter MatchList.FilterFun? A filter function.
+---@param priority integer? The match priority.
 ---@return MatchList.EvalScanner scanner The scanner.
-function M.new(eval, filter)
+function M.new(eval, filter, priority)
 	local scanner = {
 		_eval = eval,
 		_filter = filter or function(v) return v end,
+		_priority = priority or 0,
 	}
 
 	setmetatable(scanner, EvalScanner)
@@ -46,7 +49,8 @@ function EvalScanner:scan(buffer, first, last, base_data)
 					buffer = buffer,
 					lines = 1,
 					lnum = lnum,
-					data = filter_data
+					data = filter_data,
+					priority = self._priority,
 				})
 			end
 		end

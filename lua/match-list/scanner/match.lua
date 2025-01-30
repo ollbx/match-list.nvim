@@ -4,6 +4,7 @@ local M = {}
 ---@field _pattern string The match string to scan for.
 ---@field _groups string[] The names of the matched groups.
 ---@field _filter MatchList.FilterFun A filter function.
+---@field _priority integer The match priority.
 local MatchScanner = {}
 MatchScanner.__index = MatchScanner
 
@@ -11,12 +12,14 @@ MatchScanner.__index = MatchScanner
 ---@param pattern string The match string to scan for.
 ---@param groups string[]? The names for the matched groups.
 ---@param filter MatchList.FilterFun? A filter function.
+---@param priority integer? The match priority.
 ---@return MatchList.MatchScanner scanner The scanner.
-function M.new(pattern, groups, filter)
+function M.new(pattern, groups, filter, priority)
 	local scanner = {
 		_pattern = pattern,
 		_groups = groups or {},
 		_filter = filter or function(v) return v end,
+		_priority = priority or 0,
 	}
 
 	setmetatable(scanner, MatchScanner)
@@ -48,7 +51,8 @@ function MatchScanner:scan(buffer, first, last, base_data)
 					buffer = buffer,
 					lines = 1,
 					lnum = lnum,
-					data = filter_data
+					data = filter_data,
+					priority = self._priority,
 				})
 			end
 		end

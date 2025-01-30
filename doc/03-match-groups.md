@@ -134,6 +134,30 @@ end }
 *Note*: the table around the function is optional here. If you don't need to
 specify additional options, you can just use the function definition directly.
 
+## Direct property values
+
+Let's say you are matching an error and want to specify the `"type"` property
+for the _match item_, but the input string does not contain the string `"error"`.
+You can directly specify the value for `type` like this:
+
+```lua
+{ [[err: \(.*\)]], { "message", type = "error" } }
+```
+
+This works for any property.
+
+## Priorities
+
+If you have multiple _scanners_ that can match the same line, you can set a
+priority, to destinguish between them. For example:
+
+```lua
+{ [[error: \(.*\)]],       { "message" }, priority = 0 },
+{ [[fatal error: \(.*\)]], { "message" }, priority = 1 },
+```
+
+The default priority is 0.
+
 ## Multi-line matches
 
 If you need to match multiple lines at once, you can specify multiple _scanner_
@@ -151,6 +175,22 @@ The results produced by all _scanners_ are combined into a single _match item_.
 *Note*: if you need to match a single regular expression for a line, without it
 producing any output, you can just pass a single string for that line, instead
 of using a table.
+
+### Previous line data in lua functions
+
+When specifying a lua function, the function will get the item data from previous
+lines passed in as the second parameter. It should then extend that data and
+return the extended data table.
+
+```lua
+{ [[\(error\|warning\).*:\s*\(.*\)]], { "type", "message" } },
+function(line, data)
+    if line:sub(1, 5) == "note:" then
+        data["note"] = line:sub(6)
+        return data
+    end
+end
+```
 
 ### Continuation lines
 
