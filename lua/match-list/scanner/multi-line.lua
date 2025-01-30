@@ -3,17 +3,13 @@ local M = {}
 ---@class MatchList.MultiLineScanner: MatchList.Scanner
 ---@field _lines MatchList.Scanner[] Scanners for each consecutive line.
 ---@field _line_count integer The number of lines matched.
----@field _filter MatchList.FilterFun A filter function.
----@field _priority integer The match priority.
 local MultiLineScanner = {}
 MultiLineScanner.__index = MultiLineScanner
 
 ---Creates a new multi-line scanner.
 ---@param lines MatchList.Scanner[] Scanners for each consecutive line.
----@param filter MatchList.FilterFun? A filter function.
----@param priority integer? The match priority.
 ---@return MatchList.MultiLineScanner scanner The scanner.
-function M.new(lines, filter, priority)
+function M.new(lines)
 	local line_count = 0
 
 	for _, scanner in ipairs(lines) do
@@ -23,8 +19,8 @@ function M.new(lines, filter, priority)
 	local scanner = {
 		_lines = lines,
 		_line_count = line_count,
-		_filter = filter or function(v) return v end,
-		_priority = priority or 0,
+		_filter = function(v) return v end,
+		_priority = 0,
 	}
 
 	if #lines < 1 then

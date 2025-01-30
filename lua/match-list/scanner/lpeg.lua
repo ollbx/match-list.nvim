@@ -3,23 +3,19 @@ local M = {}
 ---@class MatchList.LpegScanner: MatchList.Scanner
 ---@field _lpeg userdata The LPEG pattern to match.
 ---@field _groups string[] The names of the matched groups.
----@field _filter MatchList.FilterFun A filter function.
----@field _priority integer The match priority.
 local LpegScanner = {}
 LpegScanner.__index = LpegScanner
 
 ---Creates a new LPEG scanner.
 ---@param lpeg userdata The LPEG pattern to match.
 ---@param groups string[]? The names for the matched groups.
----@param filter MatchList.FilterFun? A filter function.
----@param priority integer? The match priority.
 ---@return MatchList.LpegScanner scanner The scanner.
-function M.new(lpeg, groups, filter, priority)
+function M.new(lpeg, groups)
 	local scanner = {
 		_lpeg = lpeg,
 		_groups = groups or {},
-		_filter = filter or function(v) return v end,
-		_priority = priority or 0,
+		_filter = function(v) return v end,
+		_priority = 0,
 	}
 
 	setmetatable(scanner, LpegScanner)
