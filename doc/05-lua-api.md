@@ -54,9 +54,6 @@ M.get_visible_matches()
 ## Navigating matches
 
 ```lua
--- Opens a UI window for selecting a match to navigate to.
-M.select(sel_config)
-
 -- Directly navigates to the given match (taken from `get_matches`).
 M.goto_match(match, goto_config)
 
@@ -126,6 +123,11 @@ local goto_config = {
         return vim.api.nvim_open_win(0, false, { split = "below" })
     end,
 }
+```
+
+```lua
+-- Opens a UI window for selecting a match to navigate to.
+M.select(sel_config)
 ```
 
 `sel_config` is either `nil` or a table:

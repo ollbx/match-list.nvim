@@ -15,7 +15,7 @@ EvalScanner.__index = EvalScanner
 function M.new(eval, filter)
 	local scanner = {
 		_eval = eval,
-		_filter = filter,
+		_filter = filter or function(v) return v end,
 	}
 
 	setmetatable(scanner, EvalScanner)
