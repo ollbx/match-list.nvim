@@ -34,5 +34,5 @@ See [installation](doc/01-installation.md) to get started.
 
 ## TODO
 
-[ ] Allow for specifying a priority between matches.
-[ ] Allow matching a variable amount of input lines.
+- [ ] Allow for specifying a priority between matches.
+- [ ] Allow matching a variable amount of input lines.
