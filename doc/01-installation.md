@@ -3,6 +3,11 @@
 Setup example for lazy.nvim:
 
 ```lua
+local function open_terminal()
+    vim.cmd.terminal()
+    vim.cmd("MatchList attach")
+end
+
 return {
     "ollbx/match-list.nvim",
     cmd = "MatchList",
@@ -29,6 +34,7 @@ return {
         { "<leader>ma", "<cmd>MatchList attach<cr>", desc = "Attach to buffer" },
         { "<leader>md", "<cmd>MatchList detach<cr>", desc = "Detach from buffer" },
         { "<leader>mg", "<cmd>MatchList group<cr>", desc = "Select match group" },
+        { "<leader>mt", open_terminal, desc = "Open match terminal" },
     }
 }
 ```
