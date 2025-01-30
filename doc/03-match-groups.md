@@ -38,9 +38,13 @@ number or filenames involved etc. The default (recognized) field names are:
 
 You can define your own fields, if you want to capture other information.
 
+*Note*: you should almost always provide `message` when defining your own _scanners_.
+Furthermore if you provide `file` and `lnum`, you can navigate from the match to
+the error location directly.
+
 ## Scanner definitions
 
-Note: you can run `:MatchList debug`, to open a debugger view, that will allow
+*Note*: you can run `:MatchList debug`, to open a debugger view, that will allow
 you to easily test and experiment with scanner definitions.
 
 ### Regular expressions
@@ -127,7 +131,7 @@ any data, the function can return a table:
 end }
 ```
 
-Note: the table around the function is optional here. If you don't need to
+*Note*: the table around the function is optional here. If you don't need to
 specify additional options, you can just use the function definition directly.
 
 ## Multi-line matches
@@ -144,7 +148,7 @@ for successive lines like this:
 
 The results produced by all _scanners_ are combined into a single _match item_.
 
-Note: if you need to match a single regular expression for a line, without it
+*Note*: if you need to match a single regular expression for a line, without it
 producing any output, you can just pass a single string for that line, instead
 of using a table.
 
@@ -164,8 +168,8 @@ For example:
 
 ```lua
 {
-    [[error: \(.*\)]],
-    { "message" },
+    regex = [[error: \(.*\)]],
+    groups = { "message" },
     filter = function(data)
         if string.len(data["message"]) >= 5 then
             return data
