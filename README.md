@@ -1,5 +1,7 @@
 # match-list.nvim
 
+[![Tests](https://github.com/ollbx/match-list.nvim/actions/workflows/ci.yml/badge.svg)](https://github.com/ollbx/match-list.nvim/actions/workflows/ci.yml)
+
 This Neovim plugin is intended to automatically match, highlight and record
 error and warning messages (or anything that can be matched) in any buffer
 that you attach it to. It will also provide functions to navigate the list of
