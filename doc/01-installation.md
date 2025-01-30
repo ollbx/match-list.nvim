@@ -33,4 +33,6 @@ return {
 }
 ```
 
-You can find an overview of the configuration options under [setup](02-configuration.md).
+- You can find an overview of the configuration options under [setup](02-configuration.md).
+- For the `:MatchList` command, please refer to [command](04-command.md).
+- For the Lua API see [API](05-lua-api.md).
