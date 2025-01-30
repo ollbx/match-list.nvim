@@ -149,7 +149,7 @@ This works for any property.
 ## Priorities
 
 If you have multiple _scanners_ that can match the same line, you can set a
-priority, to destinguish between them. For example:
+priority, to distinguish between them. For example:
 
 ```lua
 { [[error: \(.*\)]],       { "message" }, priority = 0 },
