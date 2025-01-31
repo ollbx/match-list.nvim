@@ -33,7 +33,7 @@ function M.setup(config)
 	end
 
 	local function make_filter(args)
-		if #args > 1 then
+		if #args > 0 then
 			local types = {}
 
 			for _, arg in ipairs(args) do
