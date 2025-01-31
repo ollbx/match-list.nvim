@@ -240,14 +240,14 @@ function Tracker:attach(buffer, group)
 		})
 
 		self._config.attach(buffer, self)
-
-		if group then
-			self:set_group(group, buffer)
-		end
-
-		tracker:schedule_update(true)
-		tracker._matches = nil
 	end
+
+	if group then
+		self:set_group(group, buffer)
+	end
+
+	self:schedule_update(true)
+	self._matches = nil
 end
 
 ---Detaches the tracker from the given buffer.
