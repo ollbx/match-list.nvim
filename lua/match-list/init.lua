@@ -91,6 +91,7 @@ function M.setup(config)
 	end
 
 	vim.api.nvim_create_user_command("MatchList", command, {
+		bar = true,
 		nargs = "*",
 		complete = function() return vim.tbl_keys(commands) end,
 	})
