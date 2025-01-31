@@ -98,6 +98,13 @@ function M.setup(config)
 	})
 end
 
+---Changes the file window used for opening files.
+---@param window integer The window ID to use.
+---@param force boolean? `true` to force setting the window.
+function M.set_file_window(window, force)
+	M._tracker:set_file_window(window, force)
+end
+
 ---Returns the list of configured match groups.
 ---@return string[] groups The configured groups.
 function M.get_available_groups()

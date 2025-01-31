@@ -139,6 +139,15 @@ function Tracker:setup_group(name, group)
 	self:schedule_update(true)
 end
 
+---Changes the file window used for opening files.
+---@param window integer The window ID to use.
+---@param force boolean? `true` to force setting the window.
+function Tracker:set_file_window(window, force)
+	if force or not vim.api.nvim_win_is_valid(self._file_window) then
+		self._file_window = window
+	end
+end
+
 ---Returns the groups configured in the tracker.
 ---@return string[] groups The configured groups.
 function Tracker:get_available_groups()
