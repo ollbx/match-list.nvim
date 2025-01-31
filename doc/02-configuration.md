@@ -1,6 +1,6 @@
 # Configuration
 
-These are the supported configuration values and their default settings:
+This is an overview over the supported configuration options:
 
 ```lua
 opts = {
