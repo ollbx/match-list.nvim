@@ -1,5 +1,6 @@
 local M = {
 	_tracker = nil,
+	_commands = nil,
 }
 
 ---@class MatchList.Config: MatchList.Tracker.Config
@@ -49,7 +50,7 @@ function M.setup(config)
 		end
 	end
 
-	local commands = {
+	M._commands = {
 		attach = function(args)
 			if #args > 0 then
 				M.attach(nil, args)
@@ -75,7 +76,7 @@ function M.setup(config)
 		if #args.fargs == 0 then
 			M.select()
 		else
-			local fun = commands[args.fargs[1]]
+			local fun = M._commands[args.fargs[1]]
 			local rest = {}
 
 			for i=2,#args.fargs do
@@ -93,7 +94,7 @@ function M.setup(config)
 	vim.api.nvim_create_user_command("MatchList", command, {
 		bar = true,
 		nargs = "*",
-		complete = function() return vim.tbl_keys(commands) end,
+		complete = function() return vim.tbl_keys(M._commands) end,
 	})
 end
 
