@@ -483,7 +483,7 @@ local function default_notify(match, index, total)
 	if match then
 		vim.notify("[" .. index .. "/" .. total .. "]: " .. (match.data["message"] or "-"))
 	else
-		vim.notify("No more matches found")
+		vim.notify("No more matches found", vim.log.levels.WARN)
 	end
 end
 
