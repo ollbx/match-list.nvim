@@ -659,6 +659,7 @@ end
 ---@return MatchList.Match? match The match found or `nil`.
 function Tracker:skip(amount, config)
 	local def_config = {
+		notify = default_notify,
 		filter = function() return true end,
 	}
 
