@@ -24,7 +24,7 @@ function M.setup(config)
 	end
 
 	-- Select group command.
-	local function group(args, buffer)
+	local function select(args, buffer)
 		if #args == 0 then
 			M.select_group(buffer)
 		else
@@ -60,21 +60,21 @@ function M.setup(config)
 		end,
 		detach = function() M.detach() end,
 		debug = function() M.debug() end,
-		select = function() M.select() end,
+		show = function() M.show() end,
 		["goto"] = function() M.goto_below_cursor() end,
 		next = function(args) M.next(make_filter(args)) end,
 		prev = function(args) M.prev(make_filter(args)) end,
 		first = function() M.first() end,
 		last = function() M.last() end,
-		unselect = function() M.unselect() end,
-		group = function(args) group(args, nil) end,
-		lgroup = function(args) group(args, 0) end,
+		cancel = function() M.cancel() end,
+		select = function(args) select(args, nil) end,
+		lselect = function(args) select(args, 0) end,
 		quickfix = function() M.send_to_quickfix() end,
 	}
 
 	local command = function(args)
 		if #args.fargs == 0 then
-			M.select()
+			M.show()
 		else
 			local fun = M._commands[args.fargs[1]]
 			local rest = {}
@@ -220,7 +220,7 @@ end
 
 ---Opens a selection window for navigating to a specific match.
 ---@param config MatchList.GotoConfig? The navigation configaruation.
-function M.select(config)
+function M.show(config)
 	local def_config = {
 		format = default_format,
 	}
@@ -279,8 +279,8 @@ function M.last(config)
 	return M._tracker:last(config)
 end
 
----Resets the current item selection.
-function M.unselect()
+---Cancels the current item selection.
+function M.cancel()
 	M._tracker:unselect()
 end
 
