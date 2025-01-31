@@ -60,7 +60,7 @@ function M.setup(config)
 		detach = function() M.detach() end,
 		debug = function() M.debug() end,
 		select = function() M.select() end,
-		goto = function() M.goto_below_cursor() end,
+		["goto"] = function() M.goto_below_cursor() end,
 		next = function(args) M.next(make_filter(args)) end,
 		prev = function(args) M.prev(make_filter(args)) end,
 		first = function() M.first() end,
