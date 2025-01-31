@@ -685,7 +685,15 @@ function Tracker:skip(amount, config)
 		local match = self._current_match
 
 		if config.filter(match) then
-			self:goto_match(match, config)
+			-- Go to the current item again, but don't notify.
+			local goto_config = vim.tbl_extend("force", config, {
+				notify = function() end
+			})
+
+			self:goto_match(match, goto_config)
+
+			-- Show the "no more matches" notification.
+			config.notify()
 			return match
 		end
 	end
