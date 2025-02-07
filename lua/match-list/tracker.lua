@@ -545,7 +545,7 @@ function Tracker:goto_match(match, config)
 		local file_window = config.file_window
 		local match_window = config.match_window
 
-		if file_window == 0 then
+		if file_window == 0 or not vim.api.nvim_win_is_valid(file_window) then
 			-- Select the current window as the file window.
 			file_window = vim.api.nvim_get_current_win()
 		end
