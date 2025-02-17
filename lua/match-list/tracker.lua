@@ -476,6 +476,11 @@ function Tracker:get_matches()
 		for i, match in ipairs(self._matches) do
 			match.index = i
 		end
+
+		-- Update the current match entry.
+		if self._current ~= nil then
+			self._current_match = self._matches[self._current]
+		end
 	end
 
 	return self._matches
