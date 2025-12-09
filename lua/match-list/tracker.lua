@@ -531,7 +531,7 @@ function Tracker:goto_match(match, config)
 			local file = file_match.data["file"]
 
 			if vim.fn.filereadable(file) == 1 then
-				vim.cmd("silent edit " .. file)
+				vim.cmd("silent buffer " .. vim.fn.fnameescape(file))
 				return true
 			end
 		end,
