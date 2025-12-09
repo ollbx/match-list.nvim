@@ -531,7 +531,10 @@ function Tracker:goto_match(match, config)
 			local file = file_match.data["file"]
 
 			if vim.fn.filereadable(file) == 1 then
-				vim.cmd("silent buffer " .. vim.fn.fnameescape(file))
+				local ok = pcall(vim.cmd, "buffer " .. vim.fn.fnameescape(file))
+				if not ok then
+					vim.cmd("edit " .. vim.fn.fnameescape(file))
+				end
 				return true
 			end
 		end,
